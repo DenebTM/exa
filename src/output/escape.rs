@@ -7,9 +7,15 @@ pub fn push_bit(bits: &mut Vec<ANSIString<'_>>, str: String, good: &Style, bad: 
         if is_good {
             good.paint(str)
         } else {
-            bad.paint(str.escape_default().to_string())
+            bad.paint(escape_console(str))
         }
     );
+}
+
+pub fn escape_console(string: String) -> String {
+    string.as_bytes().into_iter().map(|byte: &u8| {
+        format!("$'\\x{byte:x}'")
+    }).collect()
 }
 
 pub fn escape(string: String, bits: &mut Vec<ANSIString<'_>>, good: Style, bad: Style, quote_style: QuoteStyle) {
@@ -26,7 +32,12 @@ pub fn escape(string: String, bits: &mut Vec<ANSIString<'_>>, good: Style, bad: 
         if this_char_good != last_char_good {
             if index > 0 {
                 let temp_str = string_clone.split_off(index);
+
                 push_bit(bits, string_clone, &good, &bad, last_char_good);
+                if quote_style != QuoteStyle::NoQuotes && needs_quotes {
+                    bits.push(quote_bit.clone())
+                }
+
                 string_clone = temp_str;
                 index = 0;
             }
