@@ -2,29 +2,40 @@ use ansi_term::{ANSIString, Style};
 
 use super::file_name::QuoteStyle;
 
+pub fn push_bit(bits: &mut Vec<ANSIString<'_>>, str: String, good: &Style, bad: &Style, is_good: bool) {
+    bits.push(
+        if is_good {
+            good.paint(str)
+        } else {
+            bad.paint(str.escape_default().to_string())
+        }
+    );
+}
 
 pub fn escape(string: String, bits: &mut Vec<ANSIString<'_>>, good: Style, bad: Style, quote_style: QuoteStyle) {
     let needs_quotes = string.contains(' ') || string.contains('\'');
     let quote_bit = good.paint(if string.contains('\'') { "\"" } else { "\'" });
 
-    if string.chars().all(|c| c >= 0x20 as char && c != 0x7f as char) {
-        bits.push(good.paint(string));
-    }
-    else {
-        for c in string.chars() {
-            // The `escape_default` method on `char` is *almost* what we want here, but
-            // it still escapes non-ASCII UTF-8 characters, which are still printable.
+    let mut string_clone = string.clone();
+    let mut last_char_good = true;
 
-            // TODO: This allocates way too much,
-            // hence the `all` check above.
-            if c >= 0x20 as char && c != 0x7f as char {
-                bits.push(good.paint(c.to_string()));
+    let mut index = 0;
+    for c in string.clone().chars() {
+        let this_char_good = c >= ' ' && c != '\x7f';
+        
+        if this_char_good != last_char_good {
+            if index > 0 {
+                let temp_str = string_clone.split_off(index);
+                push_bit(bits, string_clone, &good, &bad, last_char_good);
+                string_clone = temp_str;
+                index = 0;
             }
-            else {
-                bits.push(bad.paint(c.escape_default().to_string()));
-            }
+            last_char_good = this_char_good;
         }
+
+        index += 1;
     }
+    push_bit(bits, string_clone, &good, &bad, last_char_good);
 
     if quote_style != QuoteStyle::NoQuotes && needs_quotes {
         bits.insert(0, quote_bit.clone());
